@@ -30,8 +30,7 @@
                 <hr class="hr_gray">
                 <div id="projects" class="main-column-projects" data-bind="foreach: projects">
                     <div class="main-column-projects-project" data-bind="click: displayTaskOfSelectProject, css: { selected_column: $root.selectedColumn() === $data }">
-                        <label class="label_project" data-bind="attr: { 'for': `cp-project_id_${id}` }">
-                            <i class="material-icons label_project_icon darkmode-ignore" data-bind="style: { color: color }">label</i>
+                        <label class="label_project" data-bind="attr: { 'for': `cp-project_id_${id}` }, html: iconHtml()">
                         </label>
                         <input type="color" class="color-picker" data-bind="value: color, attr: { 'id': `cp-project_id_${id}` }, event: { change: changeProjectColor }"/>
                         <p class="name" data-bind="text: name, click: clickProjectName, hidden: $root.renameProject() === $data"></p>
@@ -46,7 +45,7 @@
                 </div>
             </div>
             <div class="main-todo">
-                <h2 id="todo_title" data-bind="text: $root.selectedColumn() !== null ? $root.selectedColumn().name : 'プロジェクト未選択'"></h2>
+                <h2 id="todo_title" data-bind="html: selectedColumn() !== null ? `${selectedColumn().iconHtml()}${selectedColumn().nameHtml()}` : 'プロジェクト未選択'"></h2>
                 <div class="main-todo-result">
                     <div class="main-todo-result-incomplete">
                         <h3 id="incomplete_task_count" data-bind="text: incompleteTasks().length"></h3>

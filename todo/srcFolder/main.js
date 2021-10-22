@@ -71,9 +71,19 @@ class ViewModel {
 class AbstractColumn {
     name = ko.observable('');
     color = ko.observable('#777777');
-    constructor(name, color){
+    icon = '';
+    constructor(name, color, icon){
         this.name(name);
         this.color(color);
+        this.icon = icon;
+    }
+
+    nameHtml(){
+        return this.name().replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#x27")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
     }
 }
 
@@ -81,20 +91,26 @@ class AbstractColumn {
 class Project extends AbstractColumn {
     id = null;
     constructor(id, name, color){
-        super(name, color);
+        super(name, color, 'label');
         this.id = id;
+    }
+
+    iconHtml(){
+        return `<i class="material-icons darkmode-ignore" style="color: ${this.color()}">${this.icon}</i>`;
     }
 }
 
 //コラムクラス(モデル)
 class Column extends AbstractColumn {
-    icon = '';
     type = '';
     countIncompleteTasks = ko.observable();
     constructor(name, color, icon, type){
-        super(name, color);
-        this.icon = icon;
+        super(name, color, icon);
         this.type = type;
+    }
+
+    iconHtml(){
+        return `<i class="material-icons icon-column" style="color: ${this.color()}">${this.icon}</i>`;
     }
 }
 
@@ -489,7 +505,7 @@ function changeProjectColor(project, event){
             alert("プロジェクト色変更できませんでした");
             return;
         }
-        project.color = color;
+        project.color(color);
     }).fail(function(XMLHttpRequest, status, e){
         alert("プロジェクト色変更できませんでした" + e);
     });
