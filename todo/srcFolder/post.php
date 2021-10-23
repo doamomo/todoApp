@@ -94,11 +94,9 @@ function insertProject()
     $data = $_POST['value'];
     //プロジェクトの追加SQL送信
     $project_id = SQL::insertProject($data);
-    //追加後のプロジェクトを取得
-    $new_projects_row = SQL::selectProject($project_id);
     //新しいプロジェクトのデータを返す
     header("Content-type: application/json; charset=UTF-8");
-    echo json_encode($new_projects_row);
+    echo json_encode($project_id);
     exit;
 }
 

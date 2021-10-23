@@ -39,7 +39,8 @@
  * @function openComplete
  */
 
-const COLUMN_TYPE = { TODAY: 0, TOMORROW: 1, LATER: 2, COMPLETED: 3, INCOMPLETE: 4 }; 
+const COLUMN_TYPE = { TODAY: 0, TOMORROW: 1, LATER: 2, COMPLETED: 3, INCOMPLETE: 4 };
+const DEFAULT_PROJECT_COLOR = "#777777";
 
 //ビューモデルクラス
 class ViewModel {
@@ -70,7 +71,7 @@ class ViewModel {
 //コラム抽象クラス(モデル)
 class AbstractColumn {
     name = ko.observable('');
-    color = ko.observable('#777777');
+    color = ko.observable(DEFAULT_PROJECT_COLOR);
     constructor(name, color){
         this.name(name);
         this.color(color);
@@ -420,7 +421,7 @@ function displayProjects(projectsDataArray){
         const project_id = projectsDataArray[i]["project_id"];
         const project_name = projectsDataArray[i]["project_name"];
         let color = projectsDataArray[i]["color"];
-        if(color === null) color = '#777777';
+        if(color === null) color = DEFAULT_PROJECT_COLOR;
         vm.projects.push(new Project(project_id, project_name, color));
     }
 }
@@ -457,15 +458,19 @@ function inputProject(text){
             },
             dataType: "json"
         }
-    ).done(function(data){
+    ).done(function(project_id){
+        if(project_id <= 0){
+            alert("入力に失敗しました");
+            return;
+        }
+        const project_name = $("#input_project").val();
         //追加時、入力したテキストボックスを空にする
         $("#input_project").val("");
-        //プロジェクトの末尾に追加
-        for (let i=0; i < data.length; i++){
-            let color = data[i]["color"];
-            if(color === null) color = '#777777';
-            vm.projects.push(new Project(data[i]["project_id"], data[i]["project_name"], color));
-        }
+        //プロジェクトの末尾に追加し、選択状態にする
+        const project = new Project(project_id, project_name, DEFAULT_PROJECT_COLOR);
+        vm.projects.push(project);
+        vm.selectedColumn(project);
+        displayTaskOfSelectProject(project);
     }).fail(function(XMLHttpRequest, status, e){
         alert("入力に失敗しました\n" + e);
     });
