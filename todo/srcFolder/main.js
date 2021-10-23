@@ -374,7 +374,10 @@ function displayTasks(tasksDataArray){
             },
             dataType: "json"
         }
-    ).done(function(tasksDataArray){
+    ).done(function(data){
+        if(data == 0){
+            alert("タスクはすでに削除されています");
+        }
         //タスクを除去する
         vm.incompleteTasks.remove(task);
         vm.completedTasks.remove(task);

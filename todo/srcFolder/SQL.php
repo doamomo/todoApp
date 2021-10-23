@@ -229,6 +229,7 @@ EOF;
         }
 
         $pdo = null;
+        return $stmt->rowCount();
     }
 
     //タスクの完了状態更新
