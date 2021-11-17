@@ -4,9 +4,20 @@ include_once('./config/DB.php');
 
 date_default_timezone_set('Asia/Tokyo');
 
+$pdo = null;
 $result_array = array();
 
-function execute($pdo, $sql) {
+//SQL実行結果
+abstract class Result
+{
+    public const SKIPPED = -1;
+    public const FAILURE = 0;
+    public const SUCCESS = 1;
+}
+
+//SQL実行
+function execute($sql) {
+    global $pdo;
     global $result_array;
 
     //PDOオブジェクトがnullの場合はデータベース未接続とみなす
@@ -14,8 +25,8 @@ function execute($pdo, $sql) {
         array_push($result_array, array(
             'sql' => $sql,
             'datetime' => date("Y-m-d H:i:s"),
-            'result' => false,
-            'message' => 'データベース未接続'));
+            'result' => Result::SKIPPED,
+            'message' => 'データベース未接続のためスキップしました'));
         return;
     }
 
@@ -31,12 +42,113 @@ function execute($pdo, $sql) {
     array_push($result_array, array(
         'sql' => $sql,
         'datetime' => date("Y-m-d H:i:s"),
-        'result' => $result,
+        'result' => $result ? Result::SUCCESS : Result::FAILURE,
         'message' => $message));
 }
 
+//SQL実行スキップ
+function skipExecute($sql, $message = null) {
+    global $result_array;
+
+    array_push($result_array, array(
+        'sql' => $sql,
+        'datetime' => date("Y-m-d H:i:s"),
+        'result' => Result::SKIPPED,
+        'message' => $message));
+}
+
+//テーブル存在確認
+function existsTable($table_name) {
+    global $pdo;
+
+    //PDOオブジェクトがnullの場合はデータベース未接続とみなす
+    if ($pdo === null) {
+        return false;
+    }
+
+    //テーブル存在確認
+    $sql = <<< EOF
+-- テーブル存在確認
+SELECT
+ 1
+FROM
+ `${table_name}`;
+EOF;
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        return true;
+    } catch (PDOException $e) {
+    }
+
+    return false;
+}
+
+//テーブル列存在確認
+function existsTableColumn($table_name, $column_name) {
+    global $pdo;
+
+    //PDOオブジェクトがnullの場合はデータベース未接続とみなす
+    if ($pdo === null) {
+        return false;
+    }
+
+    //テーブル列存在確認
+    $sql = <<< EOF
+-- テーブル列存在確認
+SHOW COLUMNS FROM
+ `${table_name}`
+LIKE
+ :column_name;
+EOF;
+    try {
+        $stmt = $pdo->prepare($sql);
+        if (!$stmt->execute(array(':column_name' => $column_name))) {
+            return false;
+        }
+        $array = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (count($array) === 1) {
+            return true;
+        }
+    } catch (PDOException $e) {
+    }
+
+    return false;
+}
+
+//テーブルインデックス存在確認
+function existsTableIndex($table_name, $key_name) {
+    global $pdo;
+
+    //PDOオブジェクトがnullの場合はデータベース未接続とみなす
+    if ($pdo === null) {
+        return false;
+    }
+
+    //テーブルインデックス存在確認
+    $sql = <<< EOF
+-- テーブルインデックス存在確認
+SHOW INDEX FROM
+ `${table_name}`
+WHERE
+ key_name = :key_name;
+EOF;
+    try {
+        $stmt = $pdo->prepare($sql);
+        if (!$stmt->execute(array(':key_name' => $key_name))) {
+            return false;
+        }
+        $array = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (count($array) === 1) {
+            return true;
+        }
+    } catch (PDOException $e) {
+    }
+
+    return false;
+}
+
 //DB接続
-$pdo = null;
 $sql = '-- CONNECT';
 $result = false;
 $message = null;
@@ -49,7 +161,7 @@ try {
 array_push($result_array, array(
     'sql' => '-- CONNECT',
     'datetime' => date("Y-m-d H:i:s"),
-    'result' => $result,
+    'result' => $result ? Result::SUCCESS : Result::FAILURE,
     'message' => $message));
 
 try {
@@ -74,7 +186,11 @@ CREATE TABLE
   `project_status` int(1)
 );
 EOF;
-execute($pdo, $sql);
+if (!existsTable('project')) {
+    execute($sql);
+} else {
+    skipExecute($sql, '`project`テーブル がすでに存在するためスキップしました');
+}
 
 //タスクテーブル作成
 $sql = <<< EOF
@@ -89,7 +205,11 @@ CREATE TABLE
   `task_status` int(1)
 );
 EOF;
-execute($pdo, $sql);
+if (!existsTable('task')) {
+    execute($sql);
+} else {
+    skipExecute($sql, '`task`テーブル がすでに存在するためスキップしました');
+}
 
 
 //**** ver1.3.2 (2021/09/01 18:55 JST) ****
@@ -100,7 +220,11 @@ $sql = <<< EOF
 -- taskテーブル project_id列 NOT NULL 制約追加
 ALTER TABLE `task` MODIFY `project_id` int(11) NOT NULL;
 EOF;
-execute($pdo, $sql);
+if (existsTableColumn('task', 'project_id')){
+    execute($sql);
+} else {
+    skipExecute($sql, '`task`テーブル `project_id`列 が存在しないためスキップしました');
+}
 
 //タスクテーブルproject_id列 外部キー制約追加
 $sql = <<< EOF
@@ -108,7 +232,11 @@ $sql = <<< EOF
 ALTER TABLE `task` ADD FOREIGN KEY `fk_project_id`(`project_id`)
   REFERENCES `project`(`project_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 EOF;
-execute($pdo, $sql);
+if (!existsTableIndex('task', 'fk_project_id')){
+    execute($sql);
+} else {
+    skipExecute($sql, '`task`テーブル `fk_project_id`外部キー制約 がすでに存在するためスキップしました');
+}
 
 
 //**** ver1.6.0 (2021/09/29 18:21 JST) ****
@@ -119,7 +247,11 @@ $sql = <<< EOF
 -- projectテーブル color列 追加
 ALTER TABLE `project` ADD `color` varchar(30);
 EOF;
-execute($pdo, $sql);
+if (!existsTableColumn('project', 'color')){
+    execute($sql);
+} else {
+    skipExecute($sql, '`project`テーブル `color`列 がすでに存在するためスキップしました');
+}
 
 
 //**** ver1.7.0 (2021/10/29 18:21 JST) ****
@@ -137,7 +269,11 @@ CREATE TABLE
   PRIMARY KEY(`key`, `row_index`)
 );
 EOF;
-execute($pdo, $sql);
+if (!existsTable('skin')) {
+    execute($sql);
+} else {
+    skipExecute($sql, '`skin`テーブル がすでに存在するためスキップしました');
+}
 
 $pdo = null;
 ?>
@@ -158,10 +294,23 @@ $pdo = null;
     <pre class="sql">
 <?php foreach ($result_array as $result) {
     echo htmlspecialchars($result['sql']) . PHP_EOL;
-    echo '-- =&gt; ' . $result['datetime']
-        . ' ** ' . ($result['result'] ? '成功' : '失敗') . ' **' . PHP_EOL;
+    echo '-- =&gt; ' . $result['datetime'] . ' ** ';
+    switch ($result['result']) {
+        case Result::SKIPPED:
+            echo 'スキップ';
+            break;
+        case Result::FAILURE:
+            echo '失敗';
+            break;
+        case Result::SUCCESS:
+            echo '成功';
+            break;
+        default:
+            echo '不明';
+    }
+    echo ' **' . PHP_EOL;
     if ($result['message'] !== null) {
-        echo '-- ' . htmlspecialchars($result['message']) . PHP_EOL;
+        echo '-- =&gt; ' . htmlspecialchars($result['message']) . PHP_EOL;
     }
     echo PHP_EOL;
 } ?>
